@@ -18,19 +18,39 @@ from apo.evaluation.scorer import get_scorer
 console = Console()
 
 
+def _resolve_optimizer_model(config: APOConfig) -> str:
+    """Resolve the optimizer model name, stripping any LiteLLM provider prefix.
+
+    APO sends the model name directly to an OpenAI-compatible API,
+    so provider prefixes like 'openai/' or 'gemini/' must be removed.
+    """
+    model = config.optimizer_model
+    if "/" in model:
+        return model.split("/", 1)[1]
+    return model
+
+
 def _build_openai_client(config: APOConfig) -> AsyncOpenAI:
     """Build an AsyncOpenAI client for APO gradient/edit models.
 
-    Uses Gemini's OpenAI-compatible API if a Google API key is available,
-    otherwise falls back to OpenAI.
+    Routes to the correct API endpoint based on the optimizer model name:
+    - gemini* models → Gemini OpenAI-compatible API
+    - Everything else → OpenAI API (works with gpt-*, o1-*, etc.)
+    Falls back across providers when only one API key is available.
     """
+    model = _resolve_optimizer_model(config)
     google_key = os.environ.get("GOOGLE_API_KEY")
     openai_key = os.environ.get("OPENAI_API_KEY")
 
-    if google_key and config.optimizer_model.startswith("gemini"):
-        return AsyncOpenAI(
-            api_key=google_key,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    if model.startswith("gemini"):
+        if google_key:
+            return AsyncOpenAI(
+                api_key=google_key,
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            )
+        raise RuntimeError(
+            f"GOOGLE_API_KEY required for Gemini optimizer model '{model}'.\n"
+            "Set it in your environment or .env file."
         )
 
     if openai_key:
@@ -43,8 +63,8 @@ def _build_openai_client(config: APOConfig) -> AsyncOpenAI:
         )
 
     raise RuntimeError(
-        "No API key found. Set GOOGLE_API_KEY or OPENAI_API_KEY in your environment.\n"
-        "See .env.example for details."
+        f"No API key found for optimizer model '{model}'.\n"
+        "Set OPENAI_API_KEY or GOOGLE_API_KEY in your environment."
     )
 
 
@@ -78,10 +98,11 @@ def run_optimization(
 
     # Build APO algorithm
     client = _build_openai_client(config)
+    opt_model = _resolve_optimizer_model(config)
     algo = APO[PromptTask](
         client,
-        gradient_model=config.optimizer_model,
-        apply_edit_model=config.optimizer_model,
+        gradient_model=opt_model,
+        apply_edit_model=opt_model,
         val_batch_size=config.val_batch_size,
         gradient_batch_size=config.gradient_batch_size,
         beam_width=config.beam_width,

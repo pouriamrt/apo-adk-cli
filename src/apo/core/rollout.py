@@ -18,7 +18,7 @@ from apo.evaluation.scorer import Scorer
 
 # Module-level scorer and model, set by optimizer before training
 _scorer: Scorer | None = None
-_model: str = "gemini/gemini-2.0-flash"
+_model: str = "gemini/gemini-2.5-flash"
 
 
 def configure_rollout(scorer: Scorer, model: str) -> None:
@@ -67,6 +67,7 @@ async def _run_adk_agent(prompt_text: str, user_input: str, model: str) -> str:
     )
 
     runner = InMemoryRunner(agent=agent, app_name="apo_optimizer")
+    runner.auto_create_session = True
 
     user_message = genai_types.Content(
         role="user",

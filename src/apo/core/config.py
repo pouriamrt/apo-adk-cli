@@ -7,11 +7,11 @@ from dataclasses import dataclass
 class APOConfig:
     """Configuration for the APO optimization run."""
 
-    # Model for running rollouts (LiteLLM format: "gemini/gemini-2.0-flash", "openai/gpt-4o")
-    model: str = "gemini/gemini-2.0-flash"
+    # Model for running rollouts (LiteLLM format: "gemini/gemini-2.5-flash", "openai/gpt-4o")
+    model: str = "gemini/gemini-2.5-flash"
 
     # Model for APO gradient/edit (uses Gemini OpenAI-compatible API by default)
-    optimizer_model: str = "gemini-2.0-flash"
+    optimizer_model: str = "gemini-2.5-flash"
 
     # APO beam search parameters
     beam_width: int = 3
