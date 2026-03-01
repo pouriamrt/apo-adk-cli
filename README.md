@@ -32,85 +32,11 @@ APO treats prompt optimization like gradient descent, but with natural language 
   <img src="docs/apo-architecture.png" alt="APO Architecture Diagram" width="700">
 </p>
 
-```mermaid
-graph TB
-    subgraph CLI["CLI Layer"]
-        A["apo optimize"]
-        B["apo evaluate"]
-    end
-
-    subgraph Core["Core Engine"]
-        C["Optimizer<br/><i>orchestrator</i>"]
-        D["APO Trainer<br/><i>AgentLightning</i>"]
-        E["Rollout Function<br/><i>@agl.rollout</i>"]
-    end
-
-    subgraph ADK["Google ADK"]
-        F["LlmAgent"]
-        G["InMemoryRunner"]
-        H["LiteLlm<br/><i>Model Adapter</i>"]
-    end
-
-    subgraph Eval["Evaluation"]
-        I["Scorer<br/><i>auto dispatch</i>"]
-        J["Reference<br/><i>fuzzy match</i>"]
-        K["LLM Judge<br/><i>AI grading</i>"]
-    end
-
-    subgraph Models["LLM Providers"]
-        L["Gemini"]
-        M["GPT-4o"]
-        N["Claude"]
-        O["100+ via LiteLLM"]
-    end
-
-    A --> C
-    B --> C
-    C --> D
-    D -->|"beam search<br/>textual gradients"| E
-    E --> F
-    F --> G
-    G --> H
-    H --> L & M & N & O
-    E -->|"reward"| I
-    I --> J & K
-```
-
 ### Optimization Flow
 
 <p align="center">
   <img src="docs/apo-sequence.png" alt="APO Sequence Diagram" width="900">
 </p>
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant CLI
-    participant Optimizer
-    participant APO as APO Algorithm
-    participant Rollout as Rollout Function
-    participant ADK as Google ADK Agent
-    participant LLM as LLM Provider
-    participant Scorer
-
-    User->>CLI: apo optimize --prompt "..." --dataset data.json
-    CLI->>Optimizer: run_optimization(prompt, dataset, config)
-    Optimizer->>APO: Initialize beam search
-
-    loop For each beam round
-        APO->>Rollout: Run rollouts with current prompt
-        Rollout->>ADK: Create LlmAgent with prompt
-        ADK->>LLM: Generate response
-        LLM-->>Rollout: Output
-        Rollout->>Scorer: Score output
-        Scorer-->>APO: Reward (0.0-1.0)
-        APO->>LLM: Generate textual gradient (critique)
-        APO->>LLM: Apply edit to prompt
-        APO->>APO: Select top-k candidates
-    end
-
-    APO-->>User: Best optimized prompt
-```
 
 ## Quick Start
 
