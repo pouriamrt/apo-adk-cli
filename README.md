@@ -26,6 +26,22 @@ APO treats prompt optimization like gradient descent, but with natural language 
 
 > *"APO is an iterative prompt optimization algorithm that uses LLM-generated textual gradients to improve prompts through a beam search process."* — [Pryzant et al., 2023](https://arxiv.org/abs/2305.03495)
 
+## Dashboard
+
+APO includes a **real-time dashboard** (powered by AgentLightning) that launches automatically at `http://localhost:4747` during optimization.
+
+<p align="center">
+  <img src="docs/dashboard.png" alt="AgentLightning Dashboard" width="900">
+</p>
+
+| Tab | What It Shows |
+|-----|---------------|
+| **Rollouts** | Every prompt-on-task execution with status, input, duration |
+| **Resources** | The prompt templates being optimized (your beam of candidates) |
+| **Traces** | Detailed LLM call logs per rollout |
+| **Runners** | Parallel workers and their current state |
+| **Settings** | AgentLightning configuration |
+
 ## Architecture
 
 <p align="center">
