@@ -26,5 +26,8 @@ class APOConfig:
     # Evaluation mode: "auto", "reference", "llm-judge"
     eval_mode: str = "auto"
 
+    # Vertex AI mode (uses ADC instead of API key for Google models)
+    use_vertex_ai: bool = False
+
     # Verbose output
     verbose: bool = False

@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "agentlightning[apo]",
     "google-adk",
+    "google-auth",
     "litellm",
     "openai",
     "click",
