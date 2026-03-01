@@ -44,14 +44,14 @@ APO treats prompt optimization like gradient descent, but with natural language 
 
 - **Python 3.12+**
 - **Linux or WSL** (AgentLightning requires Unix — see [Windows Setup](#windows-setup))
-- **API Key** for at least one LLM provider (Google Gemini recommended)
+- **API Key** for at least one LLM provider (the model is auto-detected from your key)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/AI-Prompt-optimizer.git
-cd AI-Prompt-optimizer
+git clone https://github.com/pouriamrt/apo-adk-cli.git
+cd apo-adk-cli
 
 # Create virtual environment and install
 uv venv
@@ -97,8 +97,8 @@ apo evaluate \
 apo optimize \
   --prompt "Your prompt template with {input} placeholder" \
   --dataset path/to/dataset.json \
-  --model "gemini/gemini-2.0-flash" \
-  --optimizer-model "gemini-2.0-flash" \
+  --model "gemini/gemini-2.5-flash" \
+  --optimizer-model "gemini-2.5-flash" \
   --eval-mode auto \
   --beam-width 3 \
   --beam-rounds 5 \
@@ -112,8 +112,8 @@ apo optimize \
 | `--prompt` | — | Prompt template string (must contain `{input}`) |
 | `--prompt-file` | — | Path to prompt template file (alternative to `--prompt`) |
 | `--dataset` | *required* | Path to dataset file (JSON or CSV) |
-| `--model` | `gemini/gemini-2.0-flash` | LLM for running prompt rollouts ([LiteLLM format](https://docs.litellm.ai/docs/providers)) |
-| `--optimizer-model` | `gemini-2.0-flash` | LLM for APO gradient/edit steps |
+| `--model` | *auto-detected* | LLM for running prompt rollouts ([LiteLLM format](https://docs.litellm.ai/docs/providers)) |
+| `--optimizer-model` | *derived from `--model`* | LLM for APO gradient/edit steps |
 | `--eval-mode` | `auto` | Scoring mode: `auto`, `reference`, or `llm-judge` |
 | `--beam-width` | `3` | Number of top prompts kept per round |
 | `--beam-rounds` | `5` | Number of optimization iterations |
@@ -184,11 +184,23 @@ Any model supported by [LiteLLM](https://docs.litellm.ai/docs/providers) works. 
 
 | Provider | Model String | Environment Variable |
 |----------|-------------|---------------------|
-| Google Gemini | `gemini/gemini-2.0-flash` | `GOOGLE_API_KEY` |
-| OpenAI | `openai/gpt-4o` | `OPENAI_API_KEY` |
-| Anthropic | `anthropic/claude-3-haiku-20240307` | `ANTHROPIC_API_KEY` |
+| OpenAI | `openai/gpt-5.2` | `OPENAI_API_KEY` |
+| Google Gemini | `gemini/gemini-2.5-flash` | `GOOGLE_API_KEY` |
+| Anthropic | `anthropic/claude-sonnet-4-6` | `ANTHROPIC_API_KEY` |
 | Ollama (local) | `ollama/llama3` | — |
 | Azure OpenAI | `azure/gpt-4` | `AZURE_API_KEY` |
+
+### Auto-Detection
+
+When `--model` is omitted, APO automatically picks the best model based on which API key is set:
+
+| API Key | Default Model |
+|---------|--------------|
+| `OPENAI_API_KEY` | `openai/gpt-5.2` |
+| `GOOGLE_API_KEY` | `gemini/gemini-2.5-flash` |
+| `ANTHROPIC_API_KEY` | `anthropic/claude-sonnet-4-6` |
+
+If multiple keys are set, priority is: OpenAI > Google > Anthropic. You can always override with `--model`.
 
 See the [full LiteLLM provider list](https://docs.litellm.ai/docs/providers) for 100+ supported models.
 
@@ -286,8 +298,8 @@ All APO parameters with their defaults:
 
 ```python
 APOConfig(
-    model="gemini/gemini-2.0-flash",     # Rollout model
-    optimizer_model="gemini-2.0-flash",   # Gradient/edit model
+    model="gemini/gemini-2.5-flash",     # Rollout model (auto-detected if omitted)
+    optimizer_model="gemini-2.5-flash",   # Gradient/edit model (derived from --model)
     beam_width=3,                         # Top prompts per round
     branch_factor=2,                      # Candidates per parent
     beam_rounds=5,                        # Optimization iterations
