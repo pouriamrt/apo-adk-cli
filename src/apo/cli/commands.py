@@ -12,15 +12,45 @@ from apo.core.config import APOConfig
 console = Console()
 
 
-def _detect_default_model() -> str:
-    """Pick the default model based on which API key is set."""
+def _detect_default_model() -> tuple[str, bool]:
+    """Pick the default model based on available credentials.
+
+    Returns (model_string, use_vertex_ai).
+    """
     if os.environ.get("OPENAI_API_KEY"):
-        return "openai/gpt-5.2"
+        return "openai/gpt-5.2", False
     if os.environ.get("GOOGLE_API_KEY"):
-        return "gemini/gemini-2.5-flash"
+        return "gemini/gemini-2.5-flash", False
     if os.environ.get("ANTHROPIC_API_KEY"):
-        return "anthropic/claude-sonnet-4-6"
-    return "gemini/gemini-2.5-flash"
+        return "anthropic/claude-sonnet-4-6", False
+
+    # No API key — check for Vertex AI (GCP) credentials
+    from apo.core.vertex_auth import is_vertex_ai_available
+
+    if is_vertex_ai_available():
+        return "vertex_ai/gemini-2.5-flash", True
+
+    return "gemini/gemini-2.5-flash", False
+
+
+def _resolve_vertex_mode(model: str, vertex_ai_flag: bool) -> tuple[str, bool]:
+    """Resolve Vertex AI mode and rewrite model prefix if needed.
+
+    Detection priority:
+    1. --model vertex_ai/... prefix → Vertex AI ON
+    2. --vertex-ai flag → force Vertex AI, rewrite gemini/ to vertex_ai/
+    3. Otherwise keep model as-is
+    """
+    if model.startswith("vertex_ai/"):
+        return model, True
+
+    if vertex_ai_flag and model.startswith("gemini/"):
+        return "vertex_ai/" + model.split("/", 1)[1], True
+
+    if vertex_ai_flag:
+        return model, True
+
+    return model, False
 
 
 @click.group()
@@ -41,6 +71,7 @@ def cli():
 @click.option("--n-runners", default=4, type=int, help="Parallel rollout runners")
 @click.option("--output", "-o", type=click.Path(), help="Save optimized prompt to file")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed rollout output")
+@click.option("--vertex-ai", "vertex_ai", is_flag=True, help="Use Vertex AI (ADC) instead of API key for Google models")
 def optimize(
     prompt: str | None,
     prompt_file: str | None,
@@ -53,16 +84,20 @@ def optimize(
     n_runners: int,
     output: str | None,
     verbose: bool,
+    vertex_ai: bool,
 ):
     """Optimize a prompt using APO algorithm."""
     prompt_text = _load_prompt(prompt, prompt_file)
 
     if not model:
-        model = _detect_default_model()
+        model, auto_vertex = _detect_default_model()
+        vertex_ai = vertex_ai or auto_vertex
+
+    model, use_vertex = _resolve_vertex_mode(model, vertex_ai)
 
     # Derive optimizer model from rollout model when not specified
     # e.g. "gemini/gemini-2.5-flash" -> "gemini-2.5-flash"
-    # e.g. "openai/gpt-4o" -> "gpt-4o"
+    # e.g. "vertex_ai/gemini-2.5-flash" -> "gemini-2.5-flash"
     if not optimizer_model:
         optimizer_model = model.split("/", 1)[-1] if "/" in model else model
 
@@ -74,6 +109,7 @@ def optimize(
         n_runners=n_runners,
         eval_mode=eval_mode,
         verbose=verbose,
+        use_vertex_ai=use_vertex,
     )
 
     from apo.core.optimizer import run_optimization
@@ -102,6 +138,7 @@ def optimize(
 @click.option("--model", default=None, help="LiteLLM model string (auto-detected from API key if omitted)")
 @click.option("--eval-mode", type=click.Choice(["auto", "reference", "llm-judge"]), default="auto")
 @click.option("--verbose", "-v", is_flag=True)
+@click.option("--vertex-ai", "vertex_ai", is_flag=True, help="Use Vertex AI (ADC) instead of API key for Google models")
 def evaluate(
     prompt: str | None,
     prompt_file: str | None,
@@ -109,14 +146,18 @@ def evaluate(
     model: str | None,
     eval_mode: str,
     verbose: bool,
+    vertex_ai: bool,
 ):
     """Evaluate a prompt on a dataset (no optimization)."""
     prompt_text = _load_prompt(prompt, prompt_file)
 
     if not model:
-        model = _detect_default_model()
+        model, auto_vertex = _detect_default_model()
+        vertex_ai = vertex_ai or auto_vertex
 
-    config = APOConfig(model=model, eval_mode=eval_mode, verbose=verbose)
+    model, use_vertex = _resolve_vertex_mode(model, vertex_ai)
+
+    config = APOConfig(model=model, eval_mode=eval_mode, verbose=verbose, use_vertex_ai=use_vertex)
 
     from apo.core.optimizer import run_evaluation
 

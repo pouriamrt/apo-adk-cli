@@ -34,13 +34,29 @@ def _build_openai_client(config: APOConfig) -> AsyncOpenAI:
     """Build an AsyncOpenAI client for APO gradient/edit models.
 
     Routes to the correct API endpoint based on the optimizer model name:
-    - gemini* models → Gemini OpenAI-compatible API
+    - Vertex AI mode + gemini* → Vertex AI OpenAI-compatible endpoint with ADC
+    - gemini* models → Gemini OpenAI-compatible API (API key)
     - Everything else → OpenAI API (works with gpt-*, o1-*, etc.)
     Falls back across providers when only one API key is available.
     """
     model = _resolve_optimizer_model(config)
     google_key = os.environ.get("GOOGLE_API_KEY")
     openai_key = os.environ.get("OPENAI_API_KEY")
+
+    if model.startswith("gemini") and config.use_vertex_ai:
+        from apo.core.vertex_auth import VertexAIConfig, get_vertex_access_token
+
+        vertex = VertexAIConfig()
+        if not vertex.project:
+            raise RuntimeError(
+                f"Vertex AI mode enabled but no GCP project found for model '{model}'.\n"
+                "Set GOOGLE_CLOUD_PROJECT or VERTEXAI_PROJECT in your environment."
+            )
+        token = get_vertex_access_token()
+        return AsyncOpenAI(
+            api_key=token,
+            base_url=vertex.openai_base_url,
+        )
 
     if model.startswith("gemini"):
         if google_key:
@@ -50,7 +66,7 @@ def _build_openai_client(config: APOConfig) -> AsyncOpenAI:
             )
         raise RuntimeError(
             f"GOOGLE_API_KEY required for Gemini optimizer model '{model}'.\n"
-            "Set it in your environment or .env file."
+            "Set it in your environment or .env file, or use --vertex-ai with GCP credentials."
         )
 
     if openai_key:
